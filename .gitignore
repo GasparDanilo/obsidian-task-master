@@ -99,4 +99,7 @@ apps/extension/vsix-build/
 
 # Task files
 # tasks.json
-# tasks/ 
+# tasks/
+
+# Pasta de planejamento do fork
+Task-master fork plan/
