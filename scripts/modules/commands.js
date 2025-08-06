@@ -77,6 +77,14 @@ import {
 	getDefaultSubtasks
 } from './config-manager.js';
 
+import {
+	syncTasksToObsidian,
+	syncTasksFromObsidian,
+	initObsidianSync,
+	validateObsidianVault,
+	getObsidianSyncStatus
+} from './task-manager/obsidian-sync.js';
+
 import { CUSTOM_PROVIDERS } from '../../src/constants/providers.js';
 
 import {
@@ -4933,6 +4941,393 @@ Examples:
 		.on('error', function (err) {
 			console.error(chalk.red(`Error: ${err.message}`));
 			process.exit(1);
+		});
+
+	// ===== OBSIDIAN SYNC COMMANDS =====
+
+	// obsidian-sync command
+	programInstance
+		.command('obsidian-sync')
+		.description('Sync tasks between TaskMaster and Obsidian vault')
+		.option(
+			'-v, --vault <path>',
+			'Path to the Obsidian vault directory (required)'
+		)
+		.option(
+			'-f, --file <file>',
+			'Path to the tasks file',
+			TASKMASTER_TASKS_FILE
+		)
+		.option(
+			'--to-obsidian',
+			'Sync tasks from TaskMaster to Obsidian (create/update markdown files)'
+		)
+		.option(
+			'--from-obsidian',
+			'Sync tasks from Obsidian to TaskMaster (read markdown files)'
+		)
+		.option(
+			'--bidirectional',
+			'Perform bidirectional sync (both directions)'
+		)
+		.option('--tag <tag>', 'Specify tag context for task operations')
+		.option('--dry-run', 'Show what would be synced without making changes')
+		.addHelpText(
+			'after',
+			`
+Examples:
+  $ task-master obsidian-sync --vault /path/to/vault --to-obsidian
+  $ task-master obsidian-sync --vault /path/to/vault --from-obsidian
+  $ task-master obsidian-sync --vault /path/to/vault --bidirectional
+  $ task-master obsidian-sync --vault /path/to/vault --to-obsidian --dry-run`
+		)
+		.action(async (options) => {
+			try {
+				// Initialize TaskMaster
+				const taskMaster = initTaskMaster({
+					tasksPath: options.file || true,
+					tag: options.tag
+				});
+
+				// Validate vault path
+				if (!options.vault) {
+					console.error(
+						chalk.red(
+							'Error: --vault parameter is required. Please provide the path to your Obsidian vault.'
+						)
+					);
+					process.exit(1);
+				}
+
+				// Validate sync direction
+				const syncDirections = [
+					options.toObsidian,
+					options.fromObsidian,
+					options.bidirectional
+				].filter(Boolean);
+
+				if (syncDirections.length === 0) {
+					console.error(
+						chalk.red(
+							'Error: Please specify a sync direction: --to-obsidian, --from-obsidian, or --bidirectional'
+						)
+					);
+					process.exit(1);
+				}
+
+				if (syncDirections.length > 1) {
+					console.error(
+						chalk.red(
+							'Error: Please specify only one sync direction at a time.'
+						)
+					);
+					process.exit(1);
+				}
+
+				// Validate vault path exists
+				const vaultPath = path.resolve(options.vault);
+				if (!fs.existsSync(vaultPath)) {
+					console.error(
+						chalk.red(`Error: Vault path does not exist: ${vaultPath}`)
+					);
+					process.exit(1);
+				}
+
+				// Check if it's a valid Obsidian vault
+				await validateObsidianVault(vaultPath);
+
+				const tag = taskMaster.getCurrentTag();
+				const tasksPath = taskMaster.getTasksPath();
+
+				// Show current context
+				displayCurrentTagIndicator(tag);
+				console.log(chalk.blue(`Obsidian vault: ${vaultPath}`));
+				console.log(chalk.blue(`Tasks file: ${tasksPath}`));
+
+				if (options.dryRun) {
+					console.log(chalk.yellow('🔍 DRY RUN MODE - No changes will be made'));
+				}
+
+				const syncOptions = {
+					vaultPath,
+					tasksPath,
+					tag,
+					projectRoot: taskMaster.getProjectRoot(),
+					dryRun: options.dryRun || false
+				};
+
+				try {
+					if (options.toObsidian) {
+						console.log(
+							chalk.blue(
+								'📝 Syncing tasks from TaskMaster to Obsidian...'
+							)
+						);
+						await syncTasksToObsidian(syncOptions);
+					} else if (options.fromObsidian) {
+						console.log(
+							chalk.blue(
+								'📖 Syncing tasks from Obsidian to TaskMaster...'
+							)
+						);
+						await syncTasksFromObsidian(syncOptions);
+					} else if (options.bidirectional) {
+						console.log(
+							chalk.blue(
+								'🔄 Performing bidirectional sync...'
+							)
+						);
+						// First sync from Obsidian to get latest changes
+						console.log(
+							chalk.blue('  📖 Step 1: Syncing from Obsidian to TaskMaster...')
+						);
+						await syncTasksFromObsidian(syncOptions);
+						// Then sync to Obsidian to update markdown files
+						console.log(
+							chalk.blue('  📝 Step 2: Syncing from TaskMaster to Obsidian...')
+						);
+						await syncTasksToObsidian(syncOptions);
+						console.log(
+							chalk.green('✅ Bidirectional sync completed!')
+						);
+					}
+				} catch (syncError) {
+					console.error(
+						chalk.red(`❌ Sync failed: ${syncError.message}`)
+					);
+					if (getDebugFlag()) {
+						console.error(syncError);
+					}
+					process.exit(1);
+				}
+			} catch (error) {
+				console.error(
+					chalk.red(`Error in Obsidian sync: ${error.message}`)
+				);
+				process.exit(1);
+			}
+		});
+
+	// obsidian-init command
+	programInstance
+		.command('obsidian-init')
+		.description('Initialize Obsidian vault integration')
+		.option(
+			'-v, --vault <path>',
+			'Path to the Obsidian vault directory (required)'
+		)
+		.option(
+			'-f, --file <file>',
+			'Path to the tasks file',
+			TASKMASTER_TASKS_FILE
+		)
+		.option('--tag <tag>', 'Specify tag context for task operations')
+		.action(async (options) => {
+			try {
+				// Initialize TaskMaster
+				const taskMaster = initTaskMaster({
+					tasksPath: options.file || true,
+					tag: options.tag
+				});
+
+				// Validate vault path
+				if (!options.vault) {
+					console.error(
+						chalk.red(
+							'Error: --vault parameter is required. Please provide the path to your Obsidian vault.'
+						)
+					);
+					process.exit(1);
+				}
+
+				const vaultPath = path.resolve(options.vault);
+				if (!fs.existsSync(vaultPath)) {
+					console.error(
+						chalk.red(`Error: Vault path does not exist: ${vaultPath}`)
+					);
+					process.exit(1);
+				}
+
+				const tag = taskMaster.getCurrentTag();
+
+				// Show current context
+				displayCurrentTagIndicator(tag);
+				console.log(chalk.blue(`Initializing Obsidian vault: ${vaultPath}`));
+
+				try {
+					await initObsidianSync({
+						vaultPath,
+						tasksPath: taskMaster.getTasksPath(),
+						tag,
+						projectRoot: taskMaster.getProjectRoot()
+					});
+					console.log(
+						chalk.green('✅ Obsidian vault integration initialized!')
+					);
+				} catch (initError) {
+					console.error(
+						chalk.red(
+							`❌ Initialization failed: ${initError.message}`
+						)
+					);
+					if (getDebugFlag()) {
+						console.error(initError);
+					}
+					process.exit(1);
+				}
+			} catch (error) {
+				console.error(
+					chalk.red(
+						`Error in Obsidian initialization: ${error.message}`
+					)
+				);
+				process.exit(1);
+			}
+		});
+
+	// obsidian-status command
+	programInstance
+		.command('obsidian-status')
+		.description('Check Obsidian vault synchronization status')
+		.option(
+			'-v, --vault <path>',
+			'Path to the Obsidian vault directory (required)'
+		)
+		.option(
+			'-f, --file <file>',
+			'Path to the tasks file',
+			TASKMASTER_TASKS_FILE
+		)
+		.option('--tag <tag>', 'Specify tag context for task operations')
+		.action(async (options) => {
+			try {
+				// Initialize TaskMaster
+				const taskMaster = initTaskMaster({
+					tasksPath: options.file || true,
+					tag: options.tag
+				});
+
+				// Validate vault path
+				if (!options.vault) {
+					console.error(
+						chalk.red(
+							'Error: --vault parameter is required. Please provide the path to your Obsidian vault.'
+						)
+					);
+					process.exit(1);
+				}
+
+				const vaultPath = path.resolve(options.vault);
+				if (!fs.existsSync(vaultPath)) {
+					console.error(
+						chalk.red(`Error: Vault path does not exist: ${vaultPath}`)
+					);
+					process.exit(1);
+				}
+
+				const tag = taskMaster.getCurrentTag();
+
+				// Show current context
+				displayCurrentTagIndicator(tag);
+				console.log(chalk.blue(`Checking Obsidian vault: ${vaultPath}`));
+
+				try {
+					const status = await getObsidianSyncStatus({
+						vaultPath,
+						tasksPath: taskMaster.getTasksPath(),
+						tag,
+						projectRoot: taskMaster.getProjectRoot()
+					});
+
+					// Display sync status
+					console.log(
+						boxen(
+							chalk.white.bold('🔄 Obsidian Sync Status') +
+								'\n\n' +
+								chalk.white(`Vault Path: ${status.vaultPath}`) +
+								'\n' +
+								chalk.white(`Tasks File: ${status.tasksPath}`) +
+								'\n' +
+								chalk.white(`Tag: ${status.tag}`) +
+								'\n' +
+								chalk.white(`Last Sync: ${status.lastSync || 'Never'}`) +
+								'\n' +
+								chalk.white(
+									`Tasks in TaskMaster: ${status.tasksInTaskMaster}`
+								) +
+								'\n' +
+								chalk.white(
+									`Tasks in Obsidian: ${status.tasksInObsidian}`
+								) +
+								'\n' +
+								(status.conflicts.length > 0
+									? '\n' +
+										  chalk.yellow.bold('⚠️  Conflicts:') +
+										  '\n' +
+										  status.conflicts
+												.map((c) => `  - ${c}`)
+												.join('\n')
+									: '') +
+								(status.outOfSync.length > 0
+									? '\n\n' +
+									  chalk.blue.bold('📋 Out of Sync:') +
+									  '\n' +
+									  status.outOfSync
+											.map((s) => `  - ${s}`)
+											.join('\n')
+									: ''),
+							{
+								padding: 1,
+								borderColor:
+									status.conflicts.length > 0
+										? 'yellow'
+										: status.outOfSync.length > 0
+											? 'blue'
+											: 'green',
+								borderStyle: 'round'
+							}
+						)
+					);
+
+					// Suggest next steps
+					if (status.conflicts.length > 0) {
+						console.log(
+							chalk.yellow(
+								'\n💡 Tip: Resolve conflicts manually, then run sync again.'
+							)
+						);
+					} else if (status.outOfSync.length > 0) {
+						console.log(
+							chalk.blue(
+								'\n💡 Tip: Run `task-master obsidian-sync --vault <path> --bidirectional` to sync.'
+							)
+						);
+					} else {
+						console.log(
+							chalk.green(
+								'✅ Everything is in sync! No action needed.'
+							)
+						);
+					}
+				} catch (statusError) {
+					console.error(
+						chalk.red(
+							`❌ Failed to check sync status: ${statusError.message}`
+						)
+					);
+					if (getDebugFlag()) {
+						console.error(statusError);
+					}
+					process.exit(1);
+				}
+			} catch (error) {
+				console.error(
+					chalk.red(
+						`Error checking Obsidian status: ${error.message}`
+					)
+				);
+				process.exit(1);
+			}
 		});
 
 	return programInstance;

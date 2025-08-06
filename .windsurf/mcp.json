@@ -1,12 +1,8 @@
 {
-	"amp.mcpServers": {
+	"mcpServers": {
 		"task-master-ai": {
 			"command": "npx",
-			"args": [
-				"-y",
-				"--package=task-master-ai",
-				"task-master-ai"
-			],
+			"args": ["-y", "--package=task-master-ai", "task-master-ai"],
 			"env": {
 				"ANTHROPIC_API_KEY": "YOUR_ANTHROPIC_API_KEY_HERE",
 				"PERPLEXITY_API_KEY": "YOUR_PERPLEXITY_API_KEY_HERE",
@@ -19,18 +15,5 @@
 				"OLLAMA_API_KEY": "YOUR_OLLAMA_API_KEY_HERE"
 			}
 		}
-	},
-	"json.schemas": [
-		{
-			"fileMatch": [
-				"src/prompts/*.json"
-			],
-			"url": "./src/prompts/schemas/prompt-template.schema.json"
-		}
-	],
-	"files.associations": {
-		"src/prompts/*.json": "json"
-	},
-	"json.format.enable": true,
-	"json.validate.enable": true
+	}
 }

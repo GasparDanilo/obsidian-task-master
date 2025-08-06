@@ -21,8 +21,8 @@ import { getDebugFlag } from '../config-manager.js';
 import { getPromptManager } from '../prompt-manager.js';
 import { displayAiUsageSummary } from '../ui.js';
 
-// Define the Zod schema for a SINGLE task object
-const prdSingleTaskSchema = z.object({
+// Define the Zod schema for a SINGLE task object - Extended for Obsidian support
+const obsidianTaskSchema = z.object({
 	id: z.number(),
 	title: z.string().min(1),
 	description: z.string().min(1),
@@ -30,8 +30,18 @@ const prdSingleTaskSchema = z.object({
 	testStrategy: z.string(),
 	priority: z.enum(['high', 'medium', 'low']),
 	dependencies: z.array(z.number()),
-	status: z.string()
+	status: z.string(),
+	// NOVOS CAMPOS OBSIDIAN
+	sourceFile: z.string().optional(), // Arquivo de origem
+	obsidianTags: z.array(z.string()).optional(), // Tags do Obsidian
+	linkedNotes: z.array(z.string()).optional(), // Links [[nota]]
+	vaultLocation: z.string().optional(),
+	syncStatus: z.enum(['synced', 'pending', 'conflict']).optional(),
+	lastSyncAt: z.string().optional()
 });
+
+// Manter compatibilidade com schema antigo
+const prdSingleTaskSchema = obsidianTaskSchema;
 
 // Define the Zod schema for the ENTIRE expected AI response object
 const prdResponseSchema = z.object({

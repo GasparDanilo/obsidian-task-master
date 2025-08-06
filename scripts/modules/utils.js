@@ -942,13 +942,18 @@ function taskExists(tasks, taskId) {
 }
 
 /**
- * Formats a task ID as a string
+ * Formats a task ID as a string - Extended for Obsidian support
  * @param {string|number} id - The task ID to format
  * @returns {string} The formatted task ID
  */
 function formatTaskId(id) {
 	if (typeof id === 'string' && id.includes('.')) {
 		return id; // Already formatted as a string with a dot (e.g., "1.2")
+	}
+
+	// NOVO: Suporte para links Obsidian
+	if (typeof id === 'string' && id.startsWith('[[') && id.endsWith(']]')) {
+		return id; // Keep Obsidian link format
 	}
 
 	if (typeof id === 'number') {
@@ -1430,6 +1435,251 @@ function ensureTagMetadata(tagObj, opts = {}) {
 	return tagObj;
 }
 
+// ===== OBSIDIAN SUPPORT UTILITIES =====
+
+/**
+ * Find task by ID (including subtasks with dot notation) - Extended for Obsidian
+ * @param {Array} tasks - Array of all tasks
+ * @param {string|number} taskId - Task ID to find
+ * @returns {Object|null} Object with task and parent (if subtask), or null
+ */
+function findTaskByIdObsidian(tasks, taskId) {
+	if (!tasks || !Array.isArray(tasks)) {
+		return null;
+	}
+
+	const formattedId = formatTaskId(taskId);
+	
+	// Check if it's a subtask (contains dot)
+	if (typeof formattedId === 'string' && formattedId.includes('.')) {
+		const [parentId, subtaskId] = formattedId.split('.').map(Number);
+		
+		const parentTask = tasks.find(t => t.id === parentId);
+		if (!parentTask || !parentTask.subtasks) {
+			return null;
+		}
+		
+		const subtask = parentTask.subtasks.find(st => st.id === subtaskId);
+		if (!subtask) {
+			return null;
+		}
+		
+		return {
+			task: subtask,
+			parent: parentTask,
+			fullId: formattedId,
+			isSubtask: true
+		};
+	}
+	
+	// Regular task
+	const numericId = typeof formattedId === 'string' ? parseInt(formattedId, 10) : formattedId;
+	const task = tasks.find(t => t.id === numericId);
+	
+	if (!task) {
+		return null;
+	}
+	
+	return {
+		task: task,
+		parent: null,
+		fullId: numericId,
+		isSubtask: false
+	};
+}
+
+/**
+ * Resolves Obsidian links to task IDs and vice versa
+ * @param {string|number} identifier - Task ID or Obsidian link
+ * @param {Array} tasks - Array of all tasks
+ * @param {string} mode - 'to-id' or 'to-link'
+ * @returns {string|number|null} Resolved identifier or null if not found
+ */
+function resolveObsidianLink(identifier, tasks, mode = 'to-id') {
+	if (!tasks || !Array.isArray(tasks)) {
+		return null;
+	}
+
+	if (mode === 'to-id') {
+		// Convert Obsidian link to task ID
+		if (typeof identifier === 'string' && identifier.startsWith('[[') && identifier.endsWith(']]')) {
+			const linkText = identifier.slice(2, -2).trim(); // Remove [[ ]] and trim
+			
+			if (!linkText) {
+				return null;
+			}
+			
+			// Find exact title match first
+			let task = tasks.find(t => 
+				t.title && t.title.toLowerCase() === linkText.toLowerCase()
+			);
+			
+			if (task) {
+				return task.id;
+			}
+			
+			// Check subtasks for exact match
+			for (const parentTask of tasks) {
+				if (parentTask.subtasks && Array.isArray(parentTask.subtasks)) {
+					const subtask = parentTask.subtasks.find(st => 
+						st.title && st.title.toLowerCase() === linkText.toLowerCase()
+					);
+					if (subtask) {
+						return `${parentTask.id}.${subtask.id}`;
+					}
+				}
+			}
+			
+			// Fallback: partial match
+			task = tasks.find(t => 
+				t.title && t.title.toLowerCase().includes(linkText.toLowerCase())
+			);
+			
+			if (task) {
+				return task.id;
+			}
+			
+			// Check subtasks for partial match
+			for (const parentTask of tasks) {
+				if (parentTask.subtasks && Array.isArray(parentTask.subtasks)) {
+					const subtask = parentTask.subtasks.find(st => 
+						st.title && st.title.toLowerCase().includes(linkText.toLowerCase())
+					);
+					if (subtask) {
+						return `${parentTask.id}.${subtask.id}`;
+					}
+				}
+			}
+		}
+		return identifier; // Return as-is if not a link
+	}
+	
+	if (mode === 'to-link') {
+		// Convert task ID to Obsidian link
+		const taskResult = findTaskByIdObsidian(tasks, identifier);
+		if (taskResult && taskResult.task && taskResult.task.title) {
+			return `[[${taskResult.task.title}]]`;
+		}
+	}
+	
+	return null;
+}
+
+/**
+ * Validate Obsidian link format and content
+ * @param {string} link - Obsidian link to validate
+ * @param {Array} tasks - Array of all tasks for reference checking
+ * @returns {Object} Validation result with valid flag and message
+ */
+function validateObsidianLink(link, tasks = []) {
+	// Check format
+	if (typeof link !== 'string') {
+		return { valid: false, message: 'Link must be a string' };
+	}
+	
+	if (!link.startsWith('[[') || !link.endsWith(']]')) {
+		return { valid: false, message: 'Link must be in [[title]] format' };
+	}
+	
+	const linkText = link.slice(2, -2).trim();
+	
+	if (!linkText) {
+		return { valid: false, message: 'Link cannot be empty' };
+	}
+	
+	if (linkText.includes('[[') || linkText.includes(']]')) {
+		return { valid: false, message: 'Nested brackets not allowed' };
+	}
+	
+	// Check if link resolves to existing task (optional validation)
+	if (tasks.length > 0) {
+		const resolvedId = resolveObsidianLink(link, tasks, 'to-id');
+		if (resolvedId === link) { // Link wasn't resolved
+			return { valid: true, message: 'Valid format but no matching task found', warning: true };
+		}
+	}
+	
+	return { valid: true, message: 'Valid Obsidian link' };
+}
+
+/**
+ * Synchronize Obsidian links with task dependencies
+ * @param {Object} task - Task object to synchronize
+ * @param {Array} allTasks - Array of all tasks
+ * @returns {boolean} True if changes were made
+ */
+function synchronizeObsidianLinks(task, allTasks) {
+	if (!task || !allTasks) {
+		return false;
+	}
+	
+	let hasChanges = false;
+	
+	// Initialize obsidianLinks array if it doesn't exist
+	if (!task.obsidianLinks) {
+		task.obsidianLinks = [];
+		hasChanges = true;
+	}
+	
+	// Sync dependencies to obsidianLinks
+	if (task.dependencies && Array.isArray(task.dependencies)) {
+		task.dependencies.forEach(depId => {
+			const obsidianLink = resolveObsidianLink(depId, allTasks, 'to-link');
+			if (obsidianLink && !task.obsidianLinks.includes(obsidianLink)) {
+				task.obsidianLinks.push(obsidianLink);
+				hasChanges = true;
+			}
+		});
+	}
+	
+	// Remove orphaned links (links that don't correspond to dependencies)
+	if (task.obsidianLinks.length > 0) {
+		const validLinks = [];
+		task.obsidianLinks.forEach(link => {
+			const resolvedId = resolveObsidianLink(link, allTasks, 'to-id');
+			if (task.dependencies && task.dependencies.includes(resolvedId)) {
+				validLinks.push(link);
+			} else {
+				hasChanges = true;
+			}
+		});
+		
+		if (validLinks.length !== task.obsidianLinks.length) {
+			task.obsidianLinks = validLinks;
+		}
+	}
+	
+	return hasChanges;
+}
+
+/**
+ * Extend tag metadata for Obsidian integration
+ * @param {Object} tagData - The tag data object
+ * @param {Object} options - Extension options
+ * @returns {void}
+ */
+function extendTagMetadataForObsidian(tagData, options = {}) {
+	if (!tagData.metadata) {
+		tagData.metadata = {};
+	}
+	
+	// Add Obsidian-specific metadata
+	if (options.vaultPath && !tagData.metadata.vaultPath) {
+		tagData.metadata.vaultPath = options.vaultPath;
+	}
+	if (options.distributedMode !== undefined) {
+		tagData.metadata.distributedMode = options.distributedMode;
+	}
+	if (options.syncSettings && !tagData.metadata.syncSettings) {
+		tagData.metadata.syncSettings = {
+			autoSync: true,
+			bidirectional: true,
+			conflictResolution: 'manual',
+			...options.syncSettings
+		};
+	}
+}
+
 // Export all utility functions and configuration
 export {
 	LOG_LEVELS,
@@ -1467,5 +1717,11 @@ export {
 	markMigrationForNotice,
 	flattenTasksWithSubtasks,
 	ensureTagMetadata,
-	normalizeTaskIds
+	normalizeTaskIds,
+	// OBSIDIAN SUPPORT FUNCTIONS
+	findTaskByIdObsidian,
+	resolveObsidianLink,
+	validateObsidianLink,
+	synchronizeObsidianLinks,
+	extendTagMetadataForObsidian
 };

@@ -94,3 +94,9 @@ apps/extension/.vscode-test/
 
 # apps/extension
 apps/extension/vsix-build/
+
+# OS specific
+
+# Task files
+# tasks.json
+# tasks/ 
