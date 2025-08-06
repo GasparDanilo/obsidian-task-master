@@ -1,4 +1,4 @@
-# Obsidian Task Master (Fork by GasparDanilo)
+# Obsidian Task Master (Fork)
 
 This is a personal fork of the original [Claude Task Master](https://github.com/eyaltoledano/claude-task-master) project.
 
