@@ -4,12 +4,6 @@ export default {
 
 	// Enable ES modules support
 	preset: null,
-	extensionsToTreatAsEsm: ['.js'],
-	globals: {
-		'ts-jest': {
-			useESM: true
-		}
-	},
 
 	// Automatically clear mock calls between every test
 	clearMocks: true,
