@@ -317,6 +317,30 @@ task-master expand --id=5 --research
 
 Here's a comprehensive reference of all available commands:
 
+### Obsidian Vault Integration
+
+**Note**: The following commands are available in the Obsidian Task Master fork for syncing with Obsidian vaults:
+
+```bash
+# Initialize Obsidian vault integration
+task-master obsidian-init --vault /path/to/obsidian/vault
+
+# Sync tasks from TaskMaster to Obsidian (create/update markdown files)
+task-master obsidian-sync --vault /path/to/vault --to-obsidian
+
+# Sync tasks from Obsidian to TaskMaster (read markdown files)
+task-master obsidian-sync --vault /path/to/vault --from-obsidian
+
+# Bidirectional sync (both directions)
+task-master obsidian-sync --vault /path/to/vault --bidirectional
+
+# Preview what would be synced without making changes
+task-master obsidian-sync --vault /path/to/vault --to-obsidian --dry-run
+
+# Check synchronization status and detect conflicts
+task-master obsidian-status --vault /path/to/vault
+```
+
 ### Parse PRD
 
 ```bash

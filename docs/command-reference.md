@@ -2,6 +2,44 @@
 
 Here's a comprehensive reference of all available commands:
 
+## Obsidian Vault Integration
+
+Sync and manage tasks between TaskMaster and your Obsidian vault.
+
+```bash
+# Initialize Obsidian vault integration
+task-master obsidian-init --vault /path/to/obsidian/vault
+
+# Sync tasks from TaskMaster to Obsidian (create/update markdown files)
+task-master obsidian-sync --vault /path/to/vault --to-obsidian
+
+# Sync tasks from Obsidian to TaskMaster (read markdown files)
+task-master obsidian-sync --vault /path/to/vault --from-obsidian
+
+# Bidirectional sync (both directions)
+task-master obsidian-sync --vault /path/to/vault --bidirectional
+
+# Preview what would be synced without making changes
+task-master obsidian-sync --vault /path/to/vault --to-obsidian --dry-run
+
+# Use with specific tag context
+task-master obsidian-sync --vault /path/to/vault --to-obsidian --tag feature-xyz
+
+# Check synchronization status and detect conflicts
+task-master obsidian-status --vault /path/to/vault
+
+# Check status for specific tag
+task-master obsidian-status --vault /path/to/vault --tag feature-xyz
+```
+
+**Obsidian Integration Features:**
+- **Bidirectional Sync**: Keep TaskMaster and Obsidian vault perfectly synchronized
+- **Markdown Generation**: Auto-create Obsidian-compatible markdown files from tasks
+- **Conflict Detection**: Identify discrepancies between systems with smart resolution suggestions
+- **Tag Support**: Full compatibility with TaskMaster's tag system
+- **Dry Run Mode**: Preview changes before applying them
+- **Status Monitoring**: Track sync timestamps, task counts, and vault health
+
 ## Parse PRD
 
 ```bash
@@ -454,3 +492,25 @@ task-master research "Best practices for this implementation" --id=15,16 --files
   - **Save to file**: Preserve entire conversation for later reference if needed
   - **Continue exploring**: Ask more follow-up questions to dig deeper
 - **Automatic file naming** with timestamps and query-based slugs when saving conversations
+
+## Sync README
+
+```bash
+# Sync current task list to README.md in project root
+task-master sync-readme
+
+# Include subtasks in the README output
+task-master sync-readme --with-subtasks
+
+# Show only tasks with specific status
+task-master sync-readme --status pending
+
+# Sync tasks from specific tag to README
+task-master sync-readme --tag feature-branch
+```
+
+**README Sync Features:**
+- **Auto-generated task lists** in your project README
+- **Status filtering** to show only relevant tasks
+- **Subtask inclusion** for detailed project overviews
+- **Tag-specific syncing** for branch or feature-based documentation

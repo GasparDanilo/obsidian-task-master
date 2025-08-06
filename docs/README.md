@@ -9,9 +9,21 @@ Welcome to the Task Master documentation. Use the links below to navigate to the
 
 ## Reference
 
-- [Command Reference](command-reference.md) - Complete list of all available commands (including research and multi-task viewing)
+- [Command Reference](command-reference.md) - Complete list of all available commands (including Obsidian integration, research, and multi-task viewing)
 - [Task Structure](task-structure.md) - Understanding the task format and features
 - [Available Models](models.md) - Complete list of supported AI models and providers
+
+## 🔗 Obsidian Integration
+
+This fork includes seamless integration with Obsidian vaults:
+
+- **Bidirectional Sync**: Keep TaskMaster and Obsidian perfectly synchronized
+- **Markdown Generation**: Auto-create Obsidian-compatible markdown files from tasks
+- **Conflict Detection**: Smart resolution of discrepancies between systems
+- **Tag Support**: Full compatibility with TaskMaster's tag system
+- **Status Monitoring**: Track sync health and task counts across systems
+
+See the [Command Reference](command-reference.md#obsidian-vault-integration) for complete Obsidian command documentation.
 
 ## Examples & Licensing
 
