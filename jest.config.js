@@ -2,6 +2,15 @@ export default {
 	// Use Node.js environment for testing
 	testEnvironment: 'node',
 
+	// Enable ES modules support
+	preset: null,
+	extensionsToTreatAsEsm: ['.js'],
+	globals: {
+		'ts-jest': {
+			useESM: true
+		}
+	},
+
 	// Automatically clear mock calls between every test
 	clearMocks: true,
 
@@ -21,7 +30,7 @@ export default {
 	transform: {},
 
 	// Disable transformations for node_modules
-	transformIgnorePatterns: ['/node_modules/'],
+	transformIgnorePatterns: ['/node_modules/(?!(mock-fs)/)'],
 
 	// Set moduleNameMapper for absolute paths
 	moduleNameMapper: {

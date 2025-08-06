@@ -274,6 +274,169 @@ function escapeRegex(string) {
 }
 
 /**
+ * Sync tasks TO Obsidian vault (create/update markdown files)
+ * @param {Object} options - Sync options
+ */
+export async function syncTasksToObsidian(options = {}) {
+    const { vaultPath, tasksPath, tag = 'master', projectRoot, dryRun = false } = options;
+    
+    log('info', `Syncing tasks TO Obsidian: ${vaultPath}`);
+    
+    // Read current tasks
+    const tasksData = readJSON(tasksPath, projectRoot, tag);
+    if (!tasksData || !tasksData.tasks) {
+        throw new Error('No tasks data found');
+    }
+    
+    const results = {
+        updated: 0,
+        created: 0,
+        errors: []
+    };
+    
+    for (const task of tasksData.tasks) {
+        try {
+            const markdownPath = path.join(vaultPath, 'Tasks', `task-${String(task.id).padStart(3, '0')}-${task.title.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}.md`);
+            
+            if (dryRun) {
+                log('info', `[DRY RUN] Would ${fs.existsSync(markdownPath) ? 'update' : 'create'}: ${markdownPath}`);
+                continue;
+            }
+            
+            const content = generateMarkdownForTask(task);
+            const dir = path.dirname(markdownPath);
+            
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
+            }
+            
+            const existed = fs.existsSync(markdownPath);
+            fs.writeFileSync(markdownPath, content, 'utf8');
+            
+            if (existed) {
+                results.updated++;
+                log('debug', `Updated: ${markdownPath}`);
+            } else {
+                results.created++;
+                log('debug', `Created: ${markdownPath}`);
+            }
+            
+        } catch (error) {
+            results.errors.push({
+                taskId: task.id,
+                error: error.message
+            });
+            log('error', `Failed to sync task ${task.id}: ${error.message}`);
+        }
+    }
+    
+    log('success', `Sync to Obsidian completed: ${results.created} created, ${results.updated} updated, ${results.errors.length} errors`);
+    return results;
+}
+
+/**
+ * Sync tasks FROM Obsidian vault (read markdown files)
+ * @param {Object} options - Sync options
+ */
+export async function syncTasksFromObsidian(options = {}) {
+    const { vaultPath, tasksPath, tag = 'master', projectRoot, dryRun = false } = options;
+    
+    log('info', `Syncing tasks FROM Obsidian: ${vaultPath}`);
+    
+    // Extract tasks from Obsidian vault
+    const vaultTasks = await extractTasksFromVault(vaultPath);
+    
+    if (vaultTasks.length === 0) {
+        log('info', 'No tasks found in Obsidian vault');
+        return { updated: 0, created: 0, errors: [] };
+    }
+    
+    // Read existing tasks
+    let tasksData = { tasks: [] };
+    try {
+        const existingData = readJSON(tasksPath, projectRoot, tag);
+        if (existingData && existingData.tasks) {
+            tasksData = existingData;
+        }
+    } catch (error) {
+        log('info', 'No existing tasks found, starting fresh');
+    }
+    
+    const results = {
+        updated: 0,
+        created: 0,
+        conflicts: 0,
+        errors: []
+    };
+    
+    for (const vaultTask of vaultTasks) {
+        try {
+            // Find existing task by title or sourceFile
+            const existingTask = tasksData.tasks.find(t => 
+                t.title === vaultTask.title ||
+                (t.sourceFile && vaultTask.sourceFile && t.sourceFile === vaultTask.sourceFile)
+            );
+            
+            if (existingTask) {
+                // Check for conflicts
+                if (hasConflict(existingTask, vaultTask)) {
+                    if (dryRun) {
+                        log('warn', `[DRY RUN] Conflict detected for task: ${existingTask.title}`);
+                    } else {
+                        existingTask.syncStatus = 'conflict';
+                        log('warn', `Conflict detected for task ${existingTask.id}: ${existingTask.title}`);
+                    }
+                    results.conflicts++;
+                } else {
+                    if (dryRun) {
+                        log('info', `[DRY RUN] Would update task: ${existingTask.title}`);
+                    } else {
+                        // Update existing task
+                        Object.assign(existingTask, vaultTask, {
+                            id: existingTask.id, // Preserve ID
+                            syncStatus: 'synced',
+                            lastSyncAt: new Date().toISOString()
+                        });
+                        log('debug', `Updated task ${existingTask.id} from Obsidian`);
+                    }
+                    results.updated++;
+                }
+            } else {
+                if (dryRun) {
+                    log('info', `[DRY RUN] Would create new task: ${vaultTask.title}`);
+                } else {
+                    // Create new task
+                    const newId = tasksData.tasks.length > 0 ? Math.max(...tasksData.tasks.map(t => t.id)) + 1 : 1;
+                    tasksData.tasks.push({
+                        ...vaultTask,
+                        id: newId,
+                        syncStatus: 'synced',
+                        lastSyncAt: new Date().toISOString()
+                    });
+                    log('info', `Created new task ${newId} from Obsidian: ${vaultTask.title}`);
+                }
+                results.created++;
+            }
+            
+        } catch (error) {
+            results.errors.push({
+                task: vaultTask.title,
+                error: error.message
+            });
+            log('error', `Failed to sync task from Obsidian: ${error.message}`);
+        }
+    }
+    
+    // Save updated tasks if not dry run
+    if (!dryRun && (results.created > 0 || results.updated > 0)) {
+        writeJSON(tasksPath, tasksData, projectRoot, tag);
+    }
+    
+    log('success', `Sync from Obsidian completed: ${results.created} created, ${results.updated} updated, ${results.conflicts} conflicts, ${results.errors.length} errors`);
+    return results;
+}
+
+/**
  * Parse Obsidian vault and generate tasks (alternative to PRD parsing)
  * @param {string} vaultPath - Path to Obsidian vault
  * @param {string} tasksPath - Path to tasks.json file
@@ -343,6 +506,205 @@ export async function parseObsidianVault(vaultPath, tasksPath, numTasks, options
         extractedTasks: processedTasks.length,
         vaultPath
     };
+}
+
+/**
+ * Initialize Obsidian vault integration
+ * @param {Object} options - Init options
+ */
+export async function initObsidianSync(options = {}) {
+    const { vaultPath, tasksPath, tag = 'master', projectRoot } = options;
+    
+    log('info', `Initializing Obsidian sync for vault: ${vaultPath}`);
+    
+    // Validate vault path
+    await validateObsidianVault(vaultPath);
+    
+    // Create necessary directories in vault
+    const tasksDir = path.join(vaultPath, 'Tasks');
+    const tagsDir = path.join(vaultPath, 'Tags');
+    
+    if (!fs.existsSync(tasksDir)) {
+        fs.mkdirSync(tasksDir, { recursive: true });
+        log('info', `Created Tasks directory: ${tasksDir}`);
+    }
+    
+    if (!fs.existsSync(tagsDir)) {
+        fs.mkdirSync(tagsDir, { recursive: true });
+        log('info', `Created Tags directory: ${tagsDir}`);
+    }
+    
+    // Create README file with sync information
+    const readmePath = path.join(vaultPath, 'TaskMaster-README.md');
+    if (!fs.existsSync(readmePath)) {
+        const readmeContent = `# TaskMaster Sync
+
+This vault is integrated with TaskMaster for bidirectional task synchronization.
+
+## Structure
+
+- \`Tasks/\` - Individual task files
+- \`Tags/\` - Tag overview files
+- \`TaskMaster-README.md\` - This file
+
+## Sync Commands
+
+\`\`\`bash
+# Sync tasks TO Obsidian
+task-master obsidian-sync --vault "${vaultPath}" --to-obsidian
+
+# Sync tasks FROM Obsidian
+task-master obsidian-sync --vault "${vaultPath}" --from-obsidian
+
+# Bidirectional sync
+task-master obsidian-sync --vault "${vaultPath}" --bidirectional
+
+# Check sync status
+task-master obsidian-status --vault "${vaultPath}"
+\`\`\`
+
+## Last Sync
+
+Initialized: ${new Date().toISOString()}
+Tag: ${tag}
+Tasks File: ${tasksPath}
+`;
+        
+        fs.writeFileSync(readmePath, readmeContent, 'utf8');
+        log('info', `Created README: ${readmePath}`);
+    }
+    
+    // Create sync configuration file
+    const syncConfigPath = path.join(vaultPath, '.taskmaster-sync.json');
+    const syncConfig = {
+        initialized: new Date().toISOString(),
+        vaultPath,
+        tasksPath,
+        tag,
+        projectRoot,
+        version: '1.0.0',
+        settings: {
+            autoSync: false,
+            conflictResolution: 'manual',
+            backupBeforeSync: true
+        }
+    };
+    
+    fs.writeFileSync(syncConfigPath, JSON.stringify(syncConfig, null, 2), 'utf8');
+    log('success', `Obsidian sync initialized successfully`);
+    
+    return {
+        success: true,
+        vaultPath,
+        tasksPath,
+        configPath: syncConfigPath,
+        readmePath
+    };
+}
+
+/**
+ * Validate that a directory is a valid Obsidian vault
+ * @param {string} vaultPath - Path to validate
+ */
+export async function validateObsidianVault(vaultPath) {
+    if (!fs.existsSync(vaultPath)) {
+        throw new Error(`Vault path does not exist: ${vaultPath}`);
+    }
+    
+    const stats = fs.statSync(vaultPath);
+    if (!stats.isDirectory()) {
+        throw new Error(`Vault path is not a directory: ${vaultPath}`);
+    }
+    
+    // Check for Obsidian vault markers
+    const obsidianDir = path.join(vaultPath, '.obsidian');
+    if (!fs.existsSync(obsidianDir)) {
+        log('warn', `No .obsidian directory found - this may not be a valid Obsidian vault: ${vaultPath}`);
+        // Don't throw error, just warn - user might want to initialize a new vault
+    }
+    
+    log('debug', `Validated Obsidian vault: ${vaultPath}`);
+    return true;
+}
+
+/**
+ * Get sync status between TaskMaster and Obsidian vault
+ * @param {Object} options - Status options
+ */
+export async function getObsidianSyncStatus(options = {}) {
+    const { vaultPath, tasksPath, tag = 'master', projectRoot } = options;
+    
+    log('info', `Checking sync status for vault: ${vaultPath}`);
+    
+    // Read TaskMaster tasks
+    let taskMasterTasks = [];
+    try {
+        const tasksData = readJSON(tasksPath, projectRoot, tag);
+        if (tasksData && tasksData.tasks) {
+            taskMasterTasks = tasksData.tasks;
+        }
+    } catch (error) {
+        log('warn', 'Could not read TaskMaster tasks');
+    }
+    
+    // Read Obsidian tasks
+    let obsidianTasks = [];
+    try {
+        obsidianTasks = await extractTasksFromVault(vaultPath);
+    } catch (error) {
+        log('warn', 'Could not read Obsidian vault tasks');
+    }
+    
+    // Check for sync config
+    let lastSync = null;
+    const syncConfigPath = path.join(vaultPath, '.taskmaster-sync.json');
+    if (fs.existsSync(syncConfigPath)) {
+        try {
+            const syncConfig = JSON.parse(fs.readFileSync(syncConfigPath, 'utf8'));
+            lastSync = syncConfig.initialized;
+        } catch (error) {
+            log('warn', 'Could not read sync config');
+        }
+    }
+    
+    // Identify conflicts and out-of-sync items
+    const conflicts = [];
+    const outOfSync = [];
+    
+    // Check TaskMaster tasks against Obsidian
+    for (const tmTask of taskMasterTasks) {
+        const obsTask = obsidianTasks.find(ot => ot.title === tmTask.title);
+        if (obsTask) {
+            if (hasConflict(tmTask, obsTask)) {
+                conflicts.push(`Task "${tmTask.title}" has conflicting changes`);
+            }
+        } else {
+            outOfSync.push(`TaskMaster task "${tmTask.title}" not found in Obsidian`);
+        }
+    }
+    
+    // Check Obsidian tasks against TaskMaster
+    for (const obsTask of obsidianTasks) {
+        const tmTask = taskMasterTasks.find(tm => tm.title === obsTask.title);
+        if (!tmTask) {
+            outOfSync.push(`Obsidian task "${obsTask.title}" not found in TaskMaster`);
+        }
+    }
+    
+    const status = {
+        vaultPath,
+        tasksPath,
+        tag,
+        lastSync,
+        tasksInTaskMaster: taskMasterTasks.length,
+        tasksInObsidian: obsidianTasks.length,
+        conflicts,
+        outOfSync,
+        inSync: conflicts.length === 0 && outOfSync.length === 0
+    };
+    
+    log('debug', `Sync status: ${status.conflicts.length} conflicts, ${status.outOfSync.length} out of sync`);
+    return status;
 }
 
 /**
