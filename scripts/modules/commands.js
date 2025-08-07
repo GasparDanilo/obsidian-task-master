@@ -5749,7 +5749,163 @@ async function runCLI(argv = process.argv) {
 		}
 
 		process.exit(1);
-	}
+		});
+
+	// obsidian-plugin-install command
+	programInstance
+		.command('obsidian-plugin-install')
+		.description('Install TaskMaster plugin to Obsidian vaults')
+		.argument('[vaultPaths...]', 'Paths to Obsidian vault directories')
+		.option(
+			'--vault <paths...>',
+			'Paths to Obsidian vault directories (alternative to positional arguments)'
+		)
+		.option(
+			'--auto-discover',
+			'Automatically discover Obsidian vaults on the system',
+			true
+		)
+		.option(
+			'--build',
+			'Build the plugin before installation (default: true)',
+			true
+		)
+		.action(async (vaultPaths, options) => {
+			try {
+				// Prevent infinite loop by checking if we're in the plugin repository
+				// Look for TaskMaster configuration files that could cause loops
+				const currentDir = process.cwd();
+				const hasTaskMasterConfig = (
+					fs.existsSync(path.join(currentDir, '.taskmaster')) ||
+					fs.existsSync(path.join(currentDir, 'taskmaster.config.json')) ||
+					fs.existsSync(path.join(currentDir, '.taskmaster.config.json'))
+				);
+
+				if (hasTaskMasterConfig) {
+					console.log(
+						chalk.yellow(
+							'⚠️  Detected TaskMaster configuration in current directory. Running installation from plugin directory to avoid configuration conflicts.'
+						)
+					);
+				}
+
+				// Import the installer
+				const pluginInstallerPath = path.join(
+					currentDir,
+					'apps/obsidian-plugin/install-plugin.js'
+				);
+
+				if (!fs.existsSync(pluginInstallerPath)) {
+					console.error(
+						chalk.red(
+							'Error: Plugin installer not found. Make sure you\'re running this command from the TaskMaster project root.'
+						)
+					);
+					console.log(
+						chalk.yellow(
+							'Expected path: apps/obsidian-plugin/install-plugin.js'
+						)
+					);
+					process.exit(1);
+				}
+
+				try {
+					const { ObsidianPluginInstaller } = await import(pluginInstallerPath);
+					const installer = new ObsidianPluginInstaller();
+
+					// Determine vault paths from arguments and options
+					let targetVaultPaths = [];
+
+					// Add positional arguments
+					if (vaultPaths && vaultPaths.length > 0) {
+						targetVaultPaths = [...vaultPaths];
+					}
+
+					// Add --vault option paths
+					if (options.vault && options.vault.length > 0) {
+						targetVaultPaths = [...targetVaultPaths, ...options.vault];
+					}
+
+					// Remove duplicates
+					targetVaultPaths = [...new Set(targetVaultPaths)];
+
+					// If no paths provided and auto-discover is disabled, show help
+					if (targetVaultPaths.length === 0 && !options.autoDiscover) {
+						console.error(
+							chalk.red(
+								'Error: No vault paths provided and auto-discovery is disabled.'
+							)
+						);
+						console.log(
+							chalk.yellow('\nUsage examples:')
+						);
+						console.log(
+							'  task-master obsidian-plugin-install /path/to/vault1 /path/to/vault2'
+						);
+						console.log(
+							'  task-master obsidian-plugin-install --vault /path/to/vault1 --vault /path/to/vault2'
+						);
+						console.log(
+							'  task-master obsidian-plugin-install --auto-discover'
+						);
+						process.exit(1);
+					}
+
+					console.log(
+						chalk.blue('🚀 TaskMaster Obsidian Plugin Installer')
+					);
+					console.log(
+						chalk.blue('=====================================\n')
+					);
+
+					if (targetVaultPaths.length > 0) {
+						console.log(
+							chalk.blue(
+								`Installing to specified vaults: ${targetVaultPaths.join(', ')}`
+							)
+						);
+					} else {
+						console.log(
+							chalk.blue('Auto-discovering Obsidian vaults...')
+						);
+					}
+
+					// Install the plugin
+					const success = await installer.install(
+						targetVaultPaths.length > 0 ? targetVaultPaths : null
+					);
+
+					if (success) {
+						console.log(
+							chalk.green('\n🎉 Plugin installation completed successfully!')
+						);
+					} else {
+						console.log(
+							chalk.red('\n❌ Plugin installation failed.')
+						);
+						process.exit(1);
+					}
+				} catch (importError) {
+					console.error(
+						chalk.red(
+							`Error importing plugin installer: ${importError.message}`
+						)
+					);
+					if (getDebugFlag()) {
+						console.error(importError);
+					}
+					process.exit(1);
+				}
+			} catch (error) {
+				console.error(
+					chalk.red(`Error in plugin installation: ${error.message}`)
+				);
+				if (getDebugFlag()) {
+					console.error(error);
+				}
+				process.exit(1);
+			}
+		});
 }
 
 /**
