@@ -100,9 +100,9 @@ apps/extension/vsix-build/
 # Pasta de planejamento do fork
 Task-master fork plan/
 
-# Task files
-# tasks.json
-# tasks/
-
 # Obsidian vault demo directory
 obsidian-vault-demo/
+
+# Task files
+# tasks.json
+# tasks/ 

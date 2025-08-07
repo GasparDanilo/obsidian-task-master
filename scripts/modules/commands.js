@@ -85,6 +85,8 @@ import {
 	getObsidianSyncStatus
 } from './task-manager/obsidian-sync.js';
 
+import parseObsidianNotes from './task-manager/parse-obsidian-notes.js';
+
 import { CUSTOM_PROVIDERS } from '../../src/constants/providers.js';
 
 import {
@@ -5330,6 +5332,209 @@ Examples:
 			}
 		});
 
+	// parse-obsidian-notes command
+	programInstance
+		.command('parse-obsidian-notes')
+		.description('Extract actionable tasks from Obsidian vault notes using AI analysis')
+		.option(
+			'-v, --vault <path>',
+			'Path to the Obsidian vault directory (required)'
+		)
+		.option(
+			'-o, --output <file>',
+			'Output file path for tasks.json'
+		)
+		.option(
+			'-n, --num-tasks <number>',
+			'Approximate number of tasks to extract (default: auto-detect based on content complexity)'
+		)
+		.option(
+			'-f, --force',
+			'Overwrite existing output file without prompting'
+		)
+		.option(
+			'--append',
+			'Append extracted tasks to existing file'
+		)
+		.option(
+			'-r, --research',
+			'Use research mode for enhanced AI analysis (requires Perplexity API key)'
+		)
+		.option(
+			'--preserve-links',
+			'Preserve Obsidian [[internal links]] in task content (default: true)',
+			true
+		)
+		.option(
+			'--include-tags',
+			'Extract and include Obsidian #tags in tasks (default: true)',
+			true
+		)
+		.option(
+			'--exclude-patterns <patterns>',
+			'Comma-separated glob patterns for files/folders to exclude from analysis (e.g., "**/Archive/**,**/Templates/**")'
+		)
+		.option(
+			'--sync-after-parse',
+			'Automatically sync extracted tasks back to Obsidian vault as markdown files (default: true)',
+			true
+		)
+		.option(
+			'--auto-sync',
+			'Enable automatic synchronization between TaskMaster and Obsidian'
+		)
+		.option('--tag <tag>', 'Specify tag context for task operations')
+		.addHelpText(
+			'after',
+			`
+Examples:
+  $ task-master parse-obsidian-notes --vault /path/to/vault
+  $ task-master parse-obsidian-notes --vault /path/to/vault --num-tasks 20
+  $ task-master parse-obsidian-notes --vault /path/to/vault --research --force
+  $ task-master parse-obsidian-notes --vault /path/to/vault --exclude-patterns "**/Archive/**,**/Templates/**"
+  $ task-master parse-obsidian-notes --vault /path/to/vault --append --tag feature-branch`
+		)
+		.action(async (options) => {
+			try {
+				// Validate required vault path
+				if (!options.vault) {
+					console.error(
+						chalk.red(
+							'Error: --vault parameter is required. Please provide the path to your Obsidian vault.'
+						)
+					);
+					process.exit(1);
+				}
+
+				// Initialize TaskMaster
+				const taskMaster = initTaskMaster({
+					tasksPath: options.output || true,
+					tag: options.tag
+				});
+
+				const vaultPath = path.resolve(options.vault);
+				const tag = taskMaster.getCurrentTag();
+				const tasksPath = taskMaster.getTasksPath();
+
+				// Validate vault path exists
+				if (!fs.existsSync(vaultPath)) {
+					console.error(
+						chalk.red(`Error: Vault path does not exist: ${vaultPath}`)
+					);
+					process.exit(1);
+				}
+
+				// Show current context
+				displayCurrentTagIndicator(tag);
+				console.log(chalk.blue(`Obsidian vault: ${vaultPath}`));
+				console.log(chalk.blue(`Output tasks file: ${tasksPath}`));
+
+				// Process exclude patterns
+				let excludePatterns = undefined;
+				if (options.excludePatterns) {
+					excludePatterns = options.excludePatterns.split(',').map(p => p.trim());
+					console.log(chalk.blue(`Excluding patterns: ${excludePatterns.join(', ')}`));
+				}
+
+				// Parse numTasks
+				let numTasks = 0; // 0 = auto-detect
+				if (options.numTasks) {
+					numTasks = parseInt(options.numTasks, 10);
+					if (Number.isNaN(numTasks) || numTasks < 0) {
+						console.error(
+							chalk.red(`Error: Invalid number of tasks: ${options.numTasks}`)
+						);
+						process.exit(1);
+					}
+					console.log(chalk.blue(`Target tasks: ${numTasks}`));
+				} else {
+					console.log(chalk.blue('Target tasks: Auto-detect based on content'));
+				}
+
+				if (options.research) {
+					console.log(
+						chalk.blue('Using research mode for enhanced AI analysis')
+					);
+				}
+
+				if (options.append) {
+					console.log(chalk.blue('Append mode: Adding to existing tasks'));
+				}
+
+				if (options.force) {
+					console.log(chalk.blue('Force mode: Overwriting without confirmation'));
+				}
+
+				try {
+					const result = await parseObsidianNotes(
+						vaultPath,
+						tasksPath,
+						numTasks,
+						{
+							projectRoot: taskMaster.getProjectRoot(),
+							tag,
+							force: options.force || false,
+							append: options.append || false,
+							research: options.research || false,
+							preserveLinks: options.preserveLinks !== false,
+							includeTags: options.includeTags !== false,
+							excludePatterns,
+							syncAfterParse: options.syncAfterParse !== false,
+							autoSync: options.autoSync || false,
+							commandName: 'parse-obsidian-notes',
+							outputType: 'cli'
+						}
+					);
+
+					if (result && result.success) {
+						console.log(
+							boxen(
+								chalk.green.bold('✅ Tasks Extracted Successfully!') +
+									'\n\n' +
+									chalk.white(`📊 Extracted: ${result.extractedTasks} tasks from ${result.sourceFiles} notes`) +
+									'\n' +
+									chalk.white(`📁 Output: ${result.tasksPath}`) +
+									'\n' +
+									chalk.white(`🏷️  Tag: ${tag}`) +
+									'\n\n' +
+									chalk.white.bold('Next Steps:') +
+									'\n' +
+									chalk.cyan(`1. Run ${chalk.yellow('task-master list')} to view extracted tasks`) +
+									'\n' +
+									chalk.cyan(`2. Run ${chalk.yellow('task-master obsidian-status --vault "' + vaultPath + '"')} to check sync status`) +
+									'\n' +
+									chalk.cyan('3. Use Obsidian plugin or TaskMaster commands to manage tasks'),
+								{
+									padding: 1,
+									borderColor: 'green',
+									borderStyle: 'round',
+									margin: { top: 1 }
+								}
+							)
+						);
+					} else {
+						console.error(
+							chalk.red('❌ Failed to extract tasks from Obsidian notes')
+						);
+						process.exit(1);
+					}
+				} catch (parseError) {
+					console.error(
+						chalk.red(`❌ Parse failed: ${parseError.message}`)
+					);
+					if (getDebugFlag()) {
+						console.error(parseError);
+					}
+					process.exit(1);
+				}
+			} catch (error) {
+				console.error(
+					chalk.red(`Error in parse-obsidian-notes: ${error.message}`)
+				);
+				process.exit(1);
+			}
+		});
+
 	// obsidian-plugin-install command
 	programInstance
 		.command('obsidian-plugin-install')
@@ -5749,163 +5954,7 @@ async function runCLI(argv = process.argv) {
 		}
 
 		process.exit(1);
-		});
-
-	// obsidian-plugin-install command
-	programInstance
-		.command('obsidian-plugin-install')
-		.description('Install TaskMaster plugin to Obsidian vaults')
-		.argument('[vaultPaths...]', 'Paths to Obsidian vault directories')
-		.option(
-			'--vault <paths...>',
-			'Paths to Obsidian vault directories (alternative to positional arguments)'
-		)
-		.option(
-			'--auto-discover',
-			'Automatically discover Obsidian vaults on the system',
-			true
-		)
-		.option(
-			'--build',
-			'Build the plugin before installation (default: true)',
-			true
-		)
-		.action(async (vaultPaths, options) => {
-			try {
-				// Prevent infinite loop by checking if we're in the plugin repository
-				// Look for TaskMaster configuration files that could cause loops
-				const currentDir = process.cwd();
-				const hasTaskMasterConfig = (
-					fs.existsSync(path.join(currentDir, '.taskmaster')) ||
-					fs.existsSync(path.join(currentDir, 'taskmaster.config.json')) ||
-					fs.existsSync(path.join(currentDir, '.taskmaster.config.json'))
-				);
-
-				if (hasTaskMasterConfig) {
-					console.log(
-						chalk.yellow(
-							'⚠️  Detected TaskMaster configuration in current directory. Running installation from plugin directory to avoid configuration conflicts.'
-						)
-					);
-				}
-
-				// Import the installer
-				const pluginInstallerPath = path.join(
-					currentDir,
-					'apps/obsidian-plugin/install-plugin.js'
-				);
-
-				if (!fs.existsSync(pluginInstallerPath)) {
-					console.error(
-						chalk.red(
-							'Error: Plugin installer not found. Make sure you\'re running this command from the TaskMaster project root.'
-						)
-					);
-					console.log(
-						chalk.yellow(
-							'Expected path: apps/obsidian-plugin/install-plugin.js'
-						)
-					);
-					process.exit(1);
-				}
-
-				try {
-					const { ObsidianPluginInstaller } = await import(pluginInstallerPath);
-					const installer = new ObsidianPluginInstaller();
-
-					// Determine vault paths from arguments and options
-					let targetVaultPaths = [];
-
-					// Add positional arguments
-					if (vaultPaths && vaultPaths.length > 0) {
-						targetVaultPaths = [...vaultPaths];
-					}
-
-					// Add --vault option paths
-					if (options.vault && options.vault.length > 0) {
-						targetVaultPaths = [...targetVaultPaths, ...options.vault];
-					}
-
-					// Remove duplicates
-					targetVaultPaths = [...new Set(targetVaultPaths)];
-
-					// If no paths provided and auto-discover is disabled, show help
-					if (targetVaultPaths.length === 0 && !options.autoDiscover) {
-						console.error(
-							chalk.red(
-								'Error: No vault paths provided and auto-discovery is disabled.'
-							)
-						);
-						console.log(
-							chalk.yellow('\nUsage examples:')
-						);
-						console.log(
-							'  task-master obsidian-plugin-install /path/to/vault1 /path/to/vault2'
-						);
-						console.log(
-							'  task-master obsidian-plugin-install --vault /path/to/vault1 --vault /path/to/vault2'
-						);
-						console.log(
-							'  task-master obsidian-plugin-install --auto-discover'
-						);
-						process.exit(1);
-					}
-
-					console.log(
-						chalk.blue('🚀 TaskMaster Obsidian Plugin Installer')
-					);
-					console.log(
-						chalk.blue('=====================================\n')
-					);
-
-					if (targetVaultPaths.length > 0) {
-						console.log(
-							chalk.blue(
-								`Installing to specified vaults: ${targetVaultPaths.join(', ')}`
-							)
-						);
-					} else {
-						console.log(
-							chalk.blue('Auto-discovering Obsidian vaults...')
-						);
-					}
-
-					// Install the plugin
-					const success = await installer.install(
-						targetVaultPaths.length > 0 ? targetVaultPaths : null
-					);
-
-					if (success) {
-						console.log(
-							chalk.green('\n🎉 Plugin installation completed successfully!')
-						);
-					} else {
-						console.log(
-							chalk.red('\n❌ Plugin installation failed.')
-						);
-						process.exit(1);
-					}
-				} catch (importError) {
-					console.error(
-						chalk.red(
-							`Error importing plugin installer: ${importError.message}`
-						)
-					);
-					if (getDebugFlag()) {
-						console.error(importError);
-					}
-					process.exit(1);
-				}
-			} catch (error) {
-				console.error(
-					chalk.red(`Error in plugin installation: ${error.message}`)
-				);
-				if (getDebugFlag()) {
-					console.error(error);
-				}
-				process.exit(1);
-			}
-		});
+	}
 }
 
 /**

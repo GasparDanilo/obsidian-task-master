@@ -40,6 +40,7 @@ import { registerResearchTool } from './research.js';
 import { registerRulesTool } from './rules.js';
 import { registerScopeUpTool } from './scope-up.js';
 import { registerScopeDownTool } from './scope-down.js';
+import { registerParseObsidianNotesTool } from './parse-obsidian-notes.js';
 
 /**
  * Register all Task Master tools with the MCP server
@@ -54,6 +55,7 @@ export function registerTaskMasterTools(server) {
 		registerModelsTool(server);
 		registerRulesTool(server);
 		registerParsePRDTool(server);
+		registerParseObsidianNotesTool(server);
 
 		// Group 2: Task Analysis & Expansion
 		registerAnalyzeProjectComplexityTool(server);

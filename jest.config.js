@@ -4,7 +4,6 @@ export default {
 
 	// Enable ES modules support
 	preset: null,
-	extensionsToTreatAsEsm: ['.js'],
 	transform: {},
 
 	// Automatically clear mock calls between every test
