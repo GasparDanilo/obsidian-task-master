@@ -4,6 +4,8 @@ export default {
 
 	// Enable ES modules support
 	preset: null,
+	extensionsToTreatAsEsm: ['.js'],
+	transform: {},
 
 	// Automatically clear mock calls between every test
 	clearMocks: true,
@@ -19,9 +21,6 @@ export default {
 
 	// The glob patterns Jest uses to detect test files
 	testMatch: ['**/__tests__/**/*.js', '**/?(*.)+(spec|test).js'],
-
-	// Transform files
-	transform: {},
 
 	// Disable transformations for node_modules
 	transformIgnorePatterns: ['/node_modules/(?!(mock-fs)/)'],

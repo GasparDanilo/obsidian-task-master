@@ -5330,6 +5330,130 @@ Examples:
 			}
 		});
 
+	// obsidian-plugin-install command
+	programInstance
+		.command('obsidian-plugin-install')
+		.description('Install TaskMaster Obsidian plugin to your vaults')
+		.option(
+			'-v, --vault <path>',
+			'Path to specific Obsidian vault (can be used multiple times)',
+			(value, previous) => previous ? previous.concat(value) : [value],
+			[]
+		)
+		.option(
+			'--auto-discover',
+			'Automatically discover and install to all found vaults'
+		)
+		.addHelpText(
+			'after',
+			`
+Examples:
+  $ task-master obsidian-plugin-install
+  $ task-master obsidian-plugin-install --vault /path/to/vault
+  $ task-master obsidian-plugin-install --vault /path/to/vault1 --vault /path/to/vault2
+  $ task-master obsidian-plugin-install --auto-discover`
+		)
+		.action(async (options) => {
+			try {
+				console.log(chalk.blue('🚀 Installing TaskMaster Obsidian Plugin...'));
+				
+				// Dynamic import of the installer
+				const pluginDir = path.join(process.cwd(), 'apps', 'obsidian-plugin');
+				const installerPath = path.join(pluginDir, 'install-plugin.js');
+				
+				// Check if plugin directory exists
+				if (!fs.existsSync(pluginDir)) {
+					console.error(
+						chalk.red(
+							'Error: Obsidian plugin not found. Make sure you\'re in the TaskMaster project root.'
+						)
+					);
+					process.exit(1);
+				}
+				
+				// Check if installer exists
+				if (!fs.existsSync(installerPath)) {
+					console.error(
+						chalk.red(
+							'Error: Plugin installer not found. The plugin might not be properly set up.'
+						)
+					);
+					process.exit(1);
+				}
+				
+				try {
+					// Import and run the installer
+					const { ObsidianPluginInstaller } = await import(installerPath);
+					const installer = new ObsidianPluginInstaller();
+					
+					// Determine vault paths
+					let vaultPaths = [];
+					if (options.vault && options.vault.length > 0) {
+						// Use specified vault paths
+						vaultPaths = options.vault.map(v => path.resolve(v));
+						
+						// Validate vault paths
+						for (const vaultPath of vaultPaths) {
+							if (!fs.existsSync(vaultPath)) {
+								console.error(
+									chalk.red(`Error: Vault path does not exist: ${vaultPath}`)
+								);
+								process.exit(1);
+							}
+							
+							const obsidianPath = path.join(vaultPath, '.obsidian');
+							if (!fs.existsSync(obsidianPath)) {
+								console.error(
+									chalk.red(
+										`Error: ${vaultPath} does not appear to be a valid Obsidian vault (no .obsidian directory found)`
+									)
+								);
+								process.exit(1);
+							}
+						}
+					} else if (options.autoDiscover) {
+						// Let installer auto-discover but don't prompt
+						vaultPaths = null;
+					} else {
+						// Interactive mode - let installer handle discovery and selection
+						vaultPaths = null;
+					}
+					
+					const success = await installer.install(vaultPaths);
+					
+					if (success) {
+						console.log(
+							chalk.green('\n🎉 Plugin installation completed successfully!')
+						);
+						console.log(
+							chalk.blue(
+								'\n💡 Next: Configure the plugin settings in Obsidian and start using TaskMaster commands via Ctrl/Cmd+P'
+							)
+						);
+					} else {
+						console.log(chalk.red('\n❌ Plugin installation failed or cancelled.'));
+						process.exit(1);
+					}
+				} catch (importError) {
+					console.error(
+						chalk.red(`Failed to load plugin installer: ${importError.message}`)
+					);
+					if (getDebugFlag()) {
+						console.error(importError);
+					}
+					process.exit(1);
+				}
+			} catch (error) {
+				console.error(
+					chalk.red(`Error installing Obsidian plugin: ${error.message}`)
+				);
+				if (getDebugFlag()) {
+					console.error(error);
+				}
+				process.exit(1);
+			}
+		});
+
 	return programInstance;
 }
 

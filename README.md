@@ -14,7 +14,30 @@ This fork extends Task Master with seamless **Obsidian Vault integration**, enab
 - **Vault Integration**: Import tasks from existing Obsidian notes and maintain consistency
 - **Tag Support**: Full compatibility with TaskMaster's tag system for organized workflows
 
+### 🔌 Obsidian Plugin
+- **Command Palette Integration**: Access TaskMaster directly from Obsidian (Ctrl/Cmd+P)
+- **Task Sidebar**: Visual task management with status-based grouping
+- **Quick Actions**: Create, start, complete, and edit tasks with one click
+- **Real-time Sync**: Tasks sync automatically with TaskMaster backend via MCP
+- **Text Selection**: Create tasks directly from selected text in any note
+- **Priority Indicators**: Color-coded priority badges for quick identification
+
 ### 🚀 New CLI Commands
+
+#### Install Obsidian Plugin
+```bash
+# Interactive installation - discovers vaults and lets you choose
+task-master obsidian-plugin-install
+
+# Install to specific vault
+task-master obsidian-plugin-install --vault /path/to/vault
+
+# Install to multiple vaults
+task-master obsidian-plugin-install --vault /path/vault1 --vault /path/vault2
+
+# Auto-install to all discovered vaults
+task-master obsidian-plugin-install --auto-discover
+```
 
 #### Initialize Obsidian Integration
 ```bash
@@ -65,8 +88,9 @@ This fork maintains full compatibility with the original Task Master while addin
 
 1. **Install**: Follow the original Task Master installation process
 2. **Initialize**: Use `task-master init` to set up your project
-3. **Connect Obsidian**: Run `task-master obsidian-init --vault /path/to/vault`
-4. **Start Syncing**: Use the sync commands to keep your systems aligned
+3. **Install Plugin** (Optional): Run `task-master obsidian-plugin-install` for GUI integration
+4. **Connect Obsidian**: Run `task-master obsidian-init --vault /path/to/vault`
+5. **Start Syncing**: Use the sync commands to keep your systems aligned
 
 ## 📚 Full Documentation
 

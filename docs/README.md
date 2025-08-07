@@ -17,6 +17,9 @@ Welcome to the Task Master documentation. Use the links below to navigate to the
 
 This fork includes seamless integration with Obsidian vaults:
 
+- **Plugin Installation**: Automated plugin installation with auto-discovery of vaults
+- **Command Palette Integration**: Access TaskMaster directly from Obsidian (Ctrl/Cmd+P)
+- **Visual Task Management**: Task sidebar with real-time MCP synchronization
 - **Bidirectional Sync**: Keep TaskMaster and Obsidian perfectly synchronized
 - **Markdown Generation**: Auto-create Obsidian-compatible markdown files from tasks
 - **Conflict Detection**: Smart resolution of discrepancies between systems

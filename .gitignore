@@ -102,4 +102,7 @@ Task-master fork plan/
 
 # Task files
 # tasks.json
-# tasks/ 
+# tasks/
+
+# Obsidian vault demo directory
+obsidian-vault-demo/

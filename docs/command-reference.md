@@ -7,6 +7,19 @@ Here's a comprehensive reference of all available commands:
 Sync and manage tasks between TaskMaster and your Obsidian vault.
 
 ```bash
+# Install TaskMaster plugin to Obsidian vaults
+# Interactive installation - discovers vaults and lets you choose
+task-master obsidian-plugin-install
+
+# Install to specific vault
+task-master obsidian-plugin-install --vault /path/to/vault
+
+# Install to multiple vaults
+task-master obsidian-plugin-install --vault /vault1 --vault /vault2
+
+# Auto-install to all discovered vaults
+task-master obsidian-plugin-install --auto-discover
+
 # Initialize Obsidian vault integration
 task-master obsidian-init --vault /path/to/obsidian/vault
 
@@ -33,6 +46,10 @@ task-master obsidian-status --vault /path/to/vault --tag feature-xyz
 ```
 
 **Obsidian Integration Features:**
+- **Plugin Installation**: Automated plugin installation to one or multiple vaults with auto-discovery
+- **Command Palette Integration**: Access TaskMaster directly from Obsidian (Ctrl/Cmd+P)
+- **Visual Task Management**: Task sidebar with status-based grouping and quick actions
+- **Real-time MCP Sync**: Plugin communicates directly with TaskMaster backend via MCP
 - **Bidirectional Sync**: Keep TaskMaster and Obsidian vault perfectly synchronized
 - **Markdown Generation**: Auto-create Obsidian-compatible markdown files from tasks
 - **Conflict Detection**: Identify discrepancies between systems with smart resolution suggestions

@@ -1,0 +1,11 @@
+{
+	"id": "task-master-obsidian",
+	"name": "TaskMaster",
+	"version": "1.0.0",
+	"minAppVersion": "0.15.0",
+	"description": "Integrate TaskMaster AI task management directly into Obsidian with command palette support",
+	"author": "GasparDanilo",
+	"authorUrl": "https://github.com/GasparDanilo/obsidian-task-master",
+	"fundingUrl": "https://github.com/GasparDanilo/obsidian-task-master",
+	"isDesktopOnly": false
+}
