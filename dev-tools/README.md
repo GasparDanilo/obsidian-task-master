@@ -1,44 +1,44 @@
-# Ferramentas de Desenvolvimento
+# Development Tools
 
-Esta pasta contém arquivos de teste, scripts de desenvolvimento e ferramentas auxiliares.
+This folder contains test files, development scripts, and auxiliary tools.
 
-## 🔧 Arquivos de Teste
+## 🔧 Test Files
 
-### Scripts de Teste
-- `test-clean-tags.js` - Testa limpeza de tags
-- `test-config-manager.js` - Testa gerenciador de configuração
-- `test-tag-functions.js` - Testa funções de tags
-- `test-version-check.js` - Testa verificação de versão
-- `test-version-check-full.js` - Teste completo de versão
+### Test Scripts
+- `test-clean-tags.js` - Tests tag cleaning functionality
+- `test-config-manager.js` - Tests configuration manager
+- `test-tag-functions.js` - Tests tag functions
+- `test-version-check.js` - Tests version checking
+- `test-version-check-full.js` - Full version check test
 
-### Arquivos de Teste
-- `test-prd.txt` - Arquivo de teste para PRD (Product Requirements Document)
+### Test Data Files
+- `test-prd.txt` - Test file for PRD (Product Requirements Document)
 
-## 📊 Arquivos de Configuração/Output
+## 📊 Configuration/Output Files
 
-### Configurações de Desenvolvimento
-- `opencode.json` - Configuração para OpenCode
-- `output.json` - Arquivo de saída para testes
+### Development Configurations
+- `opencode.json` - OpenCode configuration
+- `output.json` - Test output file
 
-## 🎯 Propósito
+## 🎯 Purpose
 
-Manter organizados:
-- Scripts de teste temporários
-- Ferramentas de desenvolvimento
-- Arquivos de configuração de teste
-- Outputs de debug e desenvolvimento
+Keep organized:
+- Temporary test scripts
+- Development tools
+- Test configuration files
+- Debug and development outputs
 
-## ⚠️ Nota Importante
+## ⚠️ Important Note
 
-Estes arquivos são para **desenvolvimento apenas** e não fazem parte da distribuição final do projeto.
+These files are for **development only** and are not part of the final project distribution.
 
-## 🚀 Como Usar
+## 🚀 How to Use
 
-1. Execute os testes a partir da raiz do projeto:
+1. Run tests from the project root:
    ```bash
    node dev-tools/test-config-manager.js
    ```
 
-2. Os arquivos JSON podem ser usados para configuração durante desenvolvimento
+2. JSON files can be used for configuration during development
 
-3. Mantenha esta pasta atualizada removendo arquivos obsoletos
+3. Keep this folder updated by removing obsolete files
